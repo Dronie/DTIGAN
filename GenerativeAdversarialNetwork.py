@@ -1,8 +1,12 @@
-import keras
-from keras import layers
-from keras.preprocessing import image
+#import keras
+#from keras import layers
+#from keras.preprocessing import image
 import numpy as np
 import os
+
+import tensorflow as tf
+from tensorflow.keras import layers
+from tf.keras.preprocessing import image
 
 latent_dim = 32
 height = 32
@@ -11,7 +15,7 @@ channels = 3
 
 
 # --------------------GENERATOR NETWORK--------------------
-generator_input = keras.Input(shape=(latent_dim,))
+generator_input = tf.keras.Input(shape=(latent_dim,))
 
 # Transforms the input into a 16 x 16, 128-channel feature map
 x = layers.Dense(128 * 16 * 16)(generator_input)
@@ -32,7 +36,7 @@ x = layers.LeakyReLU()(x)
 
 # produces a 32 x 32, 1-channel feature map (32 x 32 is the image size)
 x = layers.Conv2D(channels, 7, activation='tanh', padding='same')(x)
-generator = keras.models.Model(generator_input, x)
+generator = tf.keras.models.Model(generator_input, x)
 generator.summary()
 
 # --------------------U-NET--------------------
@@ -64,7 +68,7 @@ def decoder_block(input_tensor, concat_tensor, num_filters):
   decoder = layers.Activation('LeakyRelu')(decoder) # CHANGE
   return decoder
 
-uNet_input = keras.Input(shape=(latent_dim,))
+uNet_input = tf.keras.Input(shape=(latent_dim,))
 num_filters = 128
 
 x = layers.Dense(128 * 16 * 16)(uNet_input)
@@ -83,7 +87,7 @@ decoder_block_4 = decoder_block(decoder_block_3, skip_con_1, num_filters)
 
 x = layers.activations.tanh(decoder_block_4) # CHANGE
 
-uNet = keras.models.Model(uNet_input, x)
+uNet = tf.keras.models.Model(uNet_input, x)
 uNet.summary()
 
 # --------------------DISCRIMINATOR NETWORK--------------------
@@ -104,24 +108,24 @@ x = layers.Dropout(0.4)(x)
 
 x = layers.Dense(1, activation='sigmoid')(x)
 
-discriminator = keras.models.Model(discriminator_input, x)
+discriminator = tf.keras.models.Model(discriminator_input, x)
 discriminator.summary()
 
-discriminator_optimizer = keras.optimizers.RMSprop(lr=0.0008, clipvalue=1.0, decay=1e-8)
+discriminator_optimizer = tf.keras.optimizers.RMSprop(lr=0.0008, clipvalue=1.0, decay=1e-8)
 discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentropy')
 
 # --------------------AVERSARIAL NETWORK--------------------
 discriminator.trainable = False
 
-gan_input = keras.Input(shape=(latent_dim,))
+gan_input = tf.keras.Input(shape=(latent_dim,))
 gan_output = discriminator(uNet(gan_input))
-gan = keras.models.Model(gan_input, gan_output)
+gan = tf.keras.models.Model(gan_input, gan_output)
 
-gan_optimizer = keras.optimizers.RMSprop(lr = 0.0004, clipvalue=1.0, decay=1e-8)
+gan_optimizer = tf.keras.optimizers.RMSprop(lr = 0.0004, clipvalue=1.0, decay=1e-8)
 gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 
 # --------------------IMPLEMENTING GAN TRAINING--------------------
-(x_train, y_train), (_,_) = keras.datasets.cifar10.load_data()
+(x_train, y_train), (_,_) = tf.keras.datasets.cifar10.load_data()
 
 # select frog images
 x_train = x_train[y_train.flatten() == 6]
