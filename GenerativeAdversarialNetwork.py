@@ -43,7 +43,7 @@ generator.summary()
 def conv_block(input_tensor, num_filters):
   encoder = layers.Conv2D(num_filters, (3, 3), padding='same')(input_tensor)
   encoder = layers.BatchNormalization()(encoder)
-  encoder = layers.LeakyReLu()(encoder) # CHANGE
+  encoder = layers.LeakyReLU()(encoder) # CHANGE
   encoder = layers.Conv2D(num_filters, (3, 3), padding='same')(encoder)
   encoder = layers.BatchNormalization()(encoder)
   encoder = layers.Activation('LeakyRelu')(encoder) # CHANGE
@@ -59,13 +59,13 @@ def decoder_block(input_tensor, concat_tensor, num_filters):
   decoder = layers.Conv2DTranspose(num_filters, (2, 2), strides=(2, 2), padding='same')(input_tensor)
   decoder = layers.concatenate([concat_tensor, decoder], axis=-1)
   decoder = layers.BatchNormalization()(decoder)
-  decoder = layers.LeakyReLu()(decoder) # CHANGE
+  decoder = layers.LeakyReLU()(decoder) # CHANGE
   decoder = layers.Conv2D(num_filters, (3, 3), padding='same')(decoder)
   decoder = layers.BatchNormalization()(decoder)
-  decoder = layers.LeakyReLu()(decoder) # CHANGE
+  decoder = layers.LeakyReLU()(decoder) # CHANGE
   decoder = layers.Conv2D(num_filters, (3, 3), padding='same')(decoder)
   decoder = layers.BatchNormalization()(decoder)
-  decoder = layers.LeakyReLu()(decoder) # CHANGE
+  decoder = layers.LeakyReLU()(decoder) # CHANGE
   return decoder
 
 uNet_input = tf.keras.Input(shape=(latent_dim,))
