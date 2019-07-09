@@ -6,7 +6,7 @@ import os
 
 import tensorflow as tf
 from tensorflow.keras import layers
-from tf.keras.preprocessing import image
+from tensorflow.keras.preprocessing import image
 
 latent_dim = 32
 height = 32
