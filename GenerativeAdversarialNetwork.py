@@ -46,7 +46,7 @@ def conv_block(input_tensor, num_filters):
   encoder = layers.LeakyReLU()(encoder) # CHANGE
   encoder = layers.Conv2D(num_filters, (3, 3), padding='same')(encoder)
   encoder = layers.BatchNormalization()(encoder)
-  encoder = layers.Activation('LeakyRelu')(encoder) # CHANGE
+  encoder = layers.LeakyReLU()(encoder) # CHANGE
   return encoder
 
 def encoder_block(input_tensor, num_filters):
@@ -68,26 +68,73 @@ def decoder_block(input_tensor, concat_tensor, num_filters):
   decoder = layers.LeakyReLU()(decoder) # CHANGE
   return decoder
 
+def decoder_block_end(input_tensor, concat_tensor, num_filters):
+  decoder = layers.Conv2DTranspose(num_filters, (2, 2), strides=(2, 2), padding='same')(input_tensor)
+  decoder = layers.concatenate([concat_tensor, decoder], axis=-1)
+  decoder = layers.BatchNormalization()(decoder)
+  decoder = layers.LeakyReLU()(decoder) # CHANGE
+  decoder = layers.Conv2D(num_filters, (3, 3), padding='same')(decoder)
+  decoder = layers.BatchNormalization()(decoder)
+  decoder = layers.LeakyReLU()(decoder) # CHANGE
+  decoder = layers.Conv2D(channels, (3, 3), padding='same')(decoder)
+  decoder = layers.BatchNormalization()(decoder)
+  decoder = tf.keras.layers.Activation('tanh')(decoder) # CHANGE
+  return decoder
+
 uNet_input = tf.keras.Input(shape=(latent_dim,))
 num_filters = 128
+# Latent Space Dim
+# 32,
 
-x = layers.Dense(128 * 16 * 16)(uNet_input)
+# # Transforms the input into a 32 x 32, 128-channel feature map
+x = layers.Dense(128 * 32 * 32)(uNet_input)
 x = layers.LeakyReLU()(x)
-x = layers.Reshape((16, 16, 128))(x)
+x = layers.Reshape((32, 32, 128))(x)
+# 32, 32, 128
 
+# Encode 1
 encoder_block_1, skip_con_1 = encoder_block(x, num_filters)
+# out: 16, 16, 128 
+
+# Encode 2
 encoder_block_2, skip_con_2 = encoder_block(encoder_block_1, num_filters)
+# out: 8, 8, 128
+
+# Encode 3
 encoder_block_3, skip_con_3 = encoder_block(encoder_block_2, num_filters)
+# out: 4, 4, 128
+
+# Encode 4
 encoder_block_4, skip_con_4 = encoder_block(encoder_block_3, num_filters)
+# out: 2, 2, 128
 
+
+# Decode 1
 decoder_block_1 = decoder_block(encoder_block_4, skip_con_4, num_filters)
+# Conv2DTranspose Layer out: 2, 2, 128
+# Concat: 4, 4, 256
+# Conv2D (layer out): 2, 2, 128
+
+# Decode 2
 decoder_block_2 = decoder_block(decoder_block_1, skip_con_3, num_filters)
+# Conv2DTranspose Layer out: 4, 4, 128
+# Concat: 8, 8, 256
+# Conv2D (layer out): 4, 4, 128
+
+# Decode 3
 decoder_block_3 = decoder_block(decoder_block_2, skip_con_2, num_filters)
-decoder_block_4 = decoder_block(decoder_block_3, skip_con_1, num_filters)
+# Conv2DTranspose Layer out: 8, 8, 128
+# Concat: 16, 16, 265
+# Conv2D (layer out): 8, 8, 128
 
-x = layers.activations.tanh(decoder_block_4) # CHANGE
+# Decode 4
+decoder_block_4 = decoder_block_end(decoder_block_3, skip_con_1, num_filters)
+# Conv2DTranspose Layer out: 16, 16, 128
+# Concat: 32, 32, 256
+# Conv2D: 32, 32, 128
+# Conv2D: 32, 32, 3
 
-uNet = tf.keras.models.Model(uNet_input, x)
+uNet = tf.keras.models.Model(uNet_input, decoder_block_4)
 uNet.summary()
 
 # --------------------DISCRIMINATOR NETWORK--------------------
@@ -145,7 +192,7 @@ for step in range(iterations):
     #samples random points in the latent space
     random_latent_vectors = np.random.normal(size=(batch_size, latent_dim))
     
-    generated_images = generator.predict(random_latent_vectors)
+    generated_images = uNet.predict(random_latent_vectors)
     
     # combines them with real images
     stop = start + batch_size
