@@ -4,10 +4,46 @@
 import numpy as np
 import os
 
+import matplotlib
+import matplotlib.pyplot as plt
+
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing import image
 
+# --------------------IMPORTING THE DATA--------------------
+
+# store image paths
+corrupt_train = os.listdir('image_data/train/train_bad')
+uncorru_train = os.listdir('image_data/train/train_good')
+corrupt_valid = os.listdir('image_data/validation/validation_bad')
+uncorru_valid = os.listdir('image_data/validation/validation_good')
+train_dir = os.listdir('image_data/train')
+validation_dir = os.listdir('image_data/validation')
+
+# Data Generators from DLWP
+
+train_datagen = ImageDataGenerator(rescale=1./255) #Rescale images by 1/255
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow_from_directory(
+    'image_data/train', # directory in which images are stored
+    target_size = (100, 100), # the size of each image
+    color_mode = 'grayscale', # set colour mode to greyscale as these images have no colour
+    batch_size = 32, 
+    class_mode = "binary", # define the label type
+    )
+
+validation_generator = test_datagen.flow_from_directory(
+    'image_data/validation',
+    target_size = (100, 100),
+    color_mode = 'grayscale',
+    batch_size = 32,
+    class_mode = 'binary'
+    )
+
+
+# --------------------META DATA--------------------
 latent_dim = 32
 height = 32
 width = 32
@@ -151,14 +187,14 @@ x = layers.LeakyReLU()(x)
 x = layers.Flatten()(x)
 
 # Dropout layer to add stohasticity
-x = layers.Dropout(0.4)(x)
+#x = layers.Dropout(0.4)(x)
 
 x = layers.Dense(1, activation='sigmoid')(x)
 
 discriminator = tf.keras.models.Model(discriminator_input, x)
 discriminator.summary()
 
-discriminator_optimizer = tf.keras.optimizers.RMSprop(lr=0.0008, clipvalue=1.0, decay=1e-8)
+discriminator_optimizer = tf.keras.optimizers.SGD(lr=0.0008, momentum=0.1, decay=1e-8)
 discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentropy')
 
 # --------------------AVERSARIAL NETWORK--------------------
@@ -168,7 +204,7 @@ gan_input = tf.keras.Input(shape=(latent_dim,))
 gan_output = discriminator(uNet(gan_input))
 gan = tf.keras.models.Model(gan_input, gan_output)
 
-gan_optimizer = tf.keras.optimizers.RMSprop(lr = 0.0004, clipvalue=1.0, decay=1e-8)
+gan_optimizer = tf.keras.optimizers.Adam(lr = 0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-07)
 gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 
 # --------------------IMPLEMENTING GAN TRAINING--------------------
@@ -180,16 +216,19 @@ x_train = x_train[y_train.flatten() == 6]
 # normalize the data
 x_train = x_train.reshape((x_train.shape[0],) + (height, width, channels)).astype('float32') / 255.
 
-iterations = 10000
+iterations = 200
 batch_size = 20
 #seccifies where to save images
 save_dir = '.'
 
 start = 0
 
+a_losses = []
+d_losses = []
+
 for step in range(iterations):
     
-    #samples random points in the latent space
+    #samples random points (Gaussian Distribution) in the latent space
     random_latent_vectors = np.random.normal(size=(batch_size, latent_dim))
     
     generated_images = uNet.predict(random_latent_vectors)
@@ -219,11 +258,17 @@ for step in range(iterations):
         start = 0
     
     # occasionall saves and plots
-    if step % 100 == 0:
+    a_losses.append(a_loss)
+    d_losses.append(d_loss)
+
+    print(step)
+
+    if step % 10 == 0 and step != 0:
         gan.save_weights('gan.h5')
-        
-        print('discriminator loss:', d_loss)
-        print('advesarial loss:', a_loss)
+
+        plt.plot(range(step + 1), a_losses, 'b')
+        plt.plot(range(step + 1), d_losses, 'r')
+        plt.show()
         
         img = image.array_to_img(generated_images[0] * 255., scale=False)
         img.save(os.path.join(save_dir, 'generated_frog' + str(step) + '.png'))
