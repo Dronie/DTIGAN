@@ -2,9 +2,10 @@
 #from keras import layers
 #from keras.preprocessing import image
 import numpy as np
+from scipy import misc
 import os
+import glob
 
-import matplotlib
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -14,20 +15,20 @@ from tensorflow.keras.preprocessing import image
 # --------------------IMPORTING THE DATA--------------------
 
 # store image paths
-corrupt_train = os.listdir('image_data/train/train_bad')
-uncorru_train = os.listdir('image_data/train/train_good')
-corrupt_valid = os.listdir('image_data/validation/validation_bad')
-uncorru_valid = os.listdir('image_data/validation/validation_good')
-train_dir = os.listdir('image_data/train')
-validation_dir = os.listdir('image_data/validation')
+corrupt_data_path = 'image_data/bad_frames'
+uncorru_data_path = 'image_data/good_frames'
+bad_frames_train_path = 'image_data/train/bad_frames_train'
+bad_frames_validation_path = 'image_data/train/bad_frames_validation'    
 
 # Data Generators from DLWP
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 train_datagen = ImageDataGenerator(rescale=1./255) #Rescale images by 1/255
 test_datagen = ImageDataGenerator(rescale=1./255)
 
 train_generator = train_datagen.flow_from_directory(
-    'image_data/train', # directory in which images are stored
+    bad_frames_train_path, # directory in which images are stored
     target_size = (100, 100), # the size of each image
     color_mode = 'grayscale', # set colour mode to greyscale as these images have no colour
     batch_size = 32, 
@@ -35,7 +36,7 @@ train_generator = train_datagen.flow_from_directory(
     )
 
 validation_generator = test_datagen.flow_from_directory(
-    'image_data/validation',
+    bad_frames_validation_path,
     target_size = (100, 100),
     color_mode = 'grayscale',
     batch_size = 32,
@@ -44,30 +45,31 @@ validation_generator = test_datagen.flow_from_directory(
 
 
 # --------------------META DATA--------------------
-latent_dim = 32
-height = 32
-width = 32
+latent_dim = 100
+height = 100
+width = 100
 channels = 3
-
+iterations = 200
+batch_size = 20
 
 # --------------------GENERATOR NETWORK--------------------
 generator_input = tf.keras.Input(shape=(latent_dim,))
 
 # Transforms the input into a 16 x 16, 128-channel feature map
-x = layers.Dense(128 * 16 * 16)(generator_input)
+x = layers.Dense(64 * 50 * 50)(generator_input)
 x = layers.LeakyReLU()(x)
-x = layers.Reshape((16, 16, 128))(x)
+x = layers.Reshape((50, 50, 64))(x)
 
-x = layers.Conv2D(256, 5, padding='same')(x)
+x = layers.Conv2D(128, 5, padding='same')(x)
 x = layers.LeakyReLU()(x)
 
 # Upsamples to 32 x 32
-x = layers.Conv2DTranspose(256, 4, strides=2, padding='same')(x)
+x = layers.Conv2DTranspose(128, 4, strides=2, padding='same')(x)
 x = layers.LeakyReLU()(x)
 
-x = layers.Conv2D(256, 5, padding='same')(x)
+x = layers.Conv2D(128, 5, padding='same')(x)
 x = layers.LeakyReLU()(x)
-x = layers.Conv2D(256, 5, padding='same')(x)
+x = layers.Conv2D(128, 5, padding='same')(x)
 x = layers.LeakyReLU()(x)
 
 # produces a 32 x 32, 1-channel feature map (32 x 32 is the image size)
@@ -76,7 +78,7 @@ generator = tf.keras.models.Model(generator_input, x)
 generator.summary()
 
 # --------------------U-NET--------------------
-def conv_block(input_tensor, num_filters):
+'''def conv_block(input_tensor, num_filters):
   encoder = layers.Conv2D(num_filters, (3, 3), padding='same')(input_tensor)
   encoder = layers.BatchNormalization()(encoder)
   encoder = layers.LeakyReLU()(encoder) # CHANGE
@@ -120,12 +122,12 @@ def decoder_block_end(input_tensor, concat_tensor, num_filters):
 uNet_input = tf.keras.Input(shape=(latent_dim,))
 num_filters = 128
 # Latent Space Dim
-# 32,
+# 100,
 
 # # Transforms the input into a 32 x 32, 128-channel feature map
-x = layers.Dense(128 * 32 * 32)(uNet_input)
+x = layers.Dense(128 * 100 * 100)(uNet_input)
 x = layers.LeakyReLU()(x)
-x = layers.Reshape((32, 32, 128))(x)
+x = layers.Reshape((100, 100, 128))(x)
 # 32, 32, 128
 
 # Encode 1
@@ -172,22 +174,22 @@ decoder_block_4 = decoder_block_end(decoder_block_3, skip_con_1, num_filters)
 
 uNet = tf.keras.models.Model(uNet_input, decoder_block_4)
 uNet.summary()
-
+'''
 # --------------------DISCRIMINATOR NETWORK--------------------
 discriminator_input = layers.Input(shape=(height, width, channels))
 
-x = layers.Conv2D(128, 3)(discriminator_input)
+x = layers.Conv2D(128, (3, 3))(discriminator_input)
 x = layers.LeakyReLU()(x)
-x = layers.Conv2D(128, 4, strides=2)(x)
+x = layers.Conv2D(128, (4, 4), strides=2)(x)
 x = layers.LeakyReLU()(x)
-x = layers.Conv2D(128, 4, strides=2)(x)
+x = layers.Conv2D(128, (4, 4), strides=2)(x)
 x = layers.LeakyReLU()(x)
-x = layers.Conv2D(128, 4, strides=2)(x)
+x = layers.Conv2D(128, (4, 4), strides=2)(x)
 x = layers.LeakyReLU()(x)
 x = layers.Flatten()(x)
 
-# Dropout layer to add stohasticity
-#x = layers.Dropout(0.4)(x)
+# Dropout layer to add stochasticity
+x = layers.Dropout(0.4)(x)
 
 x = layers.Dense(1, activation='sigmoid')(x)
 
@@ -201,24 +203,29 @@ discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentro
 discriminator.trainable = False
 
 gan_input = tf.keras.Input(shape=(latent_dim,))
-gan_output = discriminator(uNet(gan_input))
+gan_output = discriminator(generator(gan_input))
 gan = tf.keras.models.Model(gan_input, gan_output)
 
 gan_optimizer = tf.keras.optimizers.Adam(lr = 0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-07)
 gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 
 # --------------------IMPLEMENTING GAN TRAINING--------------------
-(x_train, y_train), (_,_) = tf.keras.datasets.cifar10.load_data()
+(x_training, y_training), (_,_) = tf.keras.datasets.cifar10.load_data()
 
-# select frog images
-x_train = x_train[y_train.flatten() == 6]
+x_train = []
 
+
+for img_path in glob.glob("image_data/train/bad_frames_train/images/*.png"):
+    x_train.append(misc.imread(img_path))
+        
+x_train = np.array(x_train)
+
+print("data imported")
 # normalize the data
 x_train = x_train.reshape((x_train.shape[0],) + (height, width, channels)).astype('float32') / 255.
 
-iterations = 200
-batch_size = 20
-#seccifies where to save images
+
+#speccifies where to save images
 save_dir = '.'
 
 start = 0
@@ -231,7 +238,7 @@ for step in range(iterations):
     #samples random points (Gaussian Distribution) in the latent space
     random_latent_vectors = np.random.normal(size=(batch_size, latent_dim))
     
-    generated_images = uNet.predict(random_latent_vectors)
+    generated_images = generator.predict(random_latent_vectors)
     
     # combines them with real images
     stop = start + batch_size
@@ -257,7 +264,7 @@ for step in range(iterations):
     if start > len(x_train) - batch_size:
         start = 0
     
-    # occasionall saves and plots
+    # occasional saves and plots
     a_losses.append(a_loss)
     d_losses.append(d_loss)
 
