@@ -11,44 +11,11 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing import image
 
-# --------------------IMPORTING THE DATA--------------------
-
-# store image paths
-corrupt_train = os.listdir('image_data/train/train_bad')
-uncorru_train = os.listdir('image_data/train/train_good')
-corrupt_valid = os.listdir('image_data/validation/validation_bad')
-uncorru_valid = os.listdir('image_data/validation/validation_good')
-train_dir = os.listdir('image_data/train')
-validation_dir = os.listdir('image_data/validation')
-
-# Data Generators from DLWP
-
-train_datagen = ImageDataGenerator(rescale=1./255) #Rescale images by 1/255
-test_datagen = ImageDataGenerator(rescale=1./255)
-
-train_generator = train_datagen.flow_from_directory(
-    'image_data/train', # directory in which images are stored
-    target_size = (100, 100), # the size of each image
-    color_mode = 'grayscale', # set colour mode to greyscale as these images have no colour
-    batch_size = 32, 
-    class_mode = "binary", # define the label type
-    )
-
-validation_generator = test_datagen.flow_from_directory(
-    'image_data/validation',
-    target_size = (100, 100),
-    color_mode = 'grayscale',
-    batch_size = 32,
-    class_mode = 'binary'
-    )
-
-
 # --------------------META DATA--------------------
 latent_dim = 32
 height = 32
 width = 32
 channels = 3
-
 
 # --------------------GENERATOR NETWORK--------------------
 generator_input = tf.keras.Input(shape=(latent_dim,))
@@ -201,7 +168,7 @@ discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentro
 discriminator.trainable = False
 
 gan_input = tf.keras.Input(shape=(latent_dim,))
-gan_output = discriminator(uNet(gan_input))
+gan_output = discriminator(generator(gan_input))
 gan = tf.keras.models.Model(gan_input, gan_output)
 
 gan_optimizer = tf.keras.optimizers.Adam(lr = 0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-07)
@@ -231,7 +198,7 @@ for step in range(iterations):
     #samples random points (Gaussian Distribution) in the latent space
     random_latent_vectors = np.random.normal(size=(batch_size, latent_dim))
     
-    generated_images = uNet.predict(random_latent_vectors)
+    generated_images = generator.predict(random_latent_vectors)
     
     # combines them with real images
     stop = start + batch_size
