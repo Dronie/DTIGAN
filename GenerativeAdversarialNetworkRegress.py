@@ -15,14 +15,13 @@ from tensorflow.keras.preprocessing import image
 # --------------------IMPORTING THE DATA--------------------
 
 # store image paths
-corrupt_data_path = 'image_data/bad_frames'
-uncorru_data_path = 'image_data/good_frames'
-bad_frames_train_path = 'image_data/train/bad_frames_train'
-bad_frames_validation_path = 'image_data/train/bad_frames_validation'    
+corrupt_data_path = '../image_data/bad_frames'
+uncorru_data_path = '../image_data/good_frames'
+train_path = '../image_data/train/'
 
 # Data Generators from DLWP
 
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+'''from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 train_datagen = ImageDataGenerator(rescale=1./255) #Rescale images by 1/255
 test_datagen = ImageDataGenerator(rescale=1./255)
@@ -42,7 +41,7 @@ validation_generator = test_datagen.flow_from_directory(
     batch_size = 32,
     class_mode = 'binary'
     )
-
+'''
 
 # --------------------META DATA--------------------
 latent_dim = 100
@@ -50,7 +49,7 @@ height = 100
 width = 100
 channels = 3
 iterations = 200
-batch_size = 20
+batch_size = 40
 
 # --------------------GENERATOR NETWORK--------------------
 generator_input = tf.keras.Input(shape=(latent_dim,))
@@ -210,17 +209,18 @@ gan_optimizer = tf.keras.optimizers.Adam(lr = 0.00001, beta_1=0.9, beta_2=0.999,
 gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 
 # --------------------IMPLEMENTING GAN TRAINING--------------------
-(x_training, y_training), (_,_) = tf.keras.datasets.cifar10.load_data()
+#(x_training, y_training), (_,_) = tf.keras.datasets.cifar10.load_data()
 
 x_train = []
 
 
-for img_path in glob.glob("image_data/train/bad_frames_train/images/*.png"):
-    x_train.append(misc.imread(img_path))
+for img_path in glob.glob(train_path):
+    print(img_path, "*.png")
+    x_train.append(misc.imread(img_path, "*.png"))
         
 x_train = np.array(x_train)
 
-print("data imported")
+print(len(x_train), "Images imported")
 # normalize the data
 x_train = x_train.reshape((x_train.shape[0],) + (height, width, channels)).astype('float32') / 255.
 
@@ -249,7 +249,7 @@ for step in range(iterations):
     labels = np.concatenate([np.ones((batch_size, 1)), np.zeros((batch_size, 1))])
     # adds noise to the labels
     labels += 0.05 * np.random.random(labels.shape)
-    
+
     d_loss =discriminator.train_on_batch(combined_images, labels)
     
     # samples random points in the latent space
