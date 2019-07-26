@@ -214,10 +214,9 @@ gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 x_train = []
 
 
-for img_path in glob.glob(train_path):
-    print(img_path, "*.png")
-    x_train.append(misc.imread(img_path, "*.png"))
-        
+for img_path in glob.glob("../image_data/train/*.png"):
+    x_train.append(misc.imread(img_path))
+
 x_train = np.array(x_train)
 
 print(len(x_train), "Images imported")
