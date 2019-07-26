@@ -214,7 +214,7 @@ gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
 x_train = []
 
 
-for img_path in glob.glob("../image_data/train/*.png"):
+for img_path in glob.glob("../image_data/good_frames/*.png"):
     x_train.append(misc.imread(img_path))
 
 x_train = np.array(x_train)
