@@ -48,7 +48,7 @@ latent_dim = 100
 height = 100
 width = 100
 channels = 3
-iterations = 200
+iterations = 10000
 batch_size = 40
 
 # --------------------GENERATOR NETWORK--------------------
@@ -267,20 +267,23 @@ for step in range(iterations):
     a_losses.append(a_loss)
     d_losses.append(d_loss)
 
-    print(step)
-
-    if step % 10 == 0 and step != 0:
+    if step % 100 == 0 and step != 0:
         gan.save_weights('gan.h5')
-
-        plt.plot(range(step + 1), a_losses, 'b')
-        plt.plot(range(step + 1), d_losses, 'r')
-        plt.show()
         
+        print(step)
+        print("a_loss:", a_loss)
+        print("d_loss:", d_loss)
+
         img = image.array_to_img(generated_images[0] * 255., scale=False)
         img.save(os.path.join(save_dir, 'generated_frog' + str(step) + '.png'))
         
         img = image.array_to_img(real_images[0] * 255., scale=False)
         img.save(os.path.join(save_dir, 'real_frog' + str(step) + '.png'))
+    
+    if step % 1000 == 0 and step != 0:
+      plt.plot(range(step + 1), a_losses, 'b')
+      plt.plot(range(step + 1), d_losses, 'r')
+      plt.show()
 
 
 
